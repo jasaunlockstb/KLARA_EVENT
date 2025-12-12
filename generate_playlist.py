@@ -1,104 +1,101 @@
 import requests
 import json
-from flask import Flask, Response
 
-# --- Konfigurasi ---
-# Lebih baik gunakan environment variable untuk data sensitif
-# import os
-# API_BASE_URL = os.environ.get('API_BASE_URL', 'https://kltrar2.elutuna.workers.dev/vip')
-# API_AUTH = os.environ.get('API_AUTH', 'kltraid-secret-Rahasiaku69456')
-
+# Konstanta dan Header, sama seperti di kode Javascript
 API_BASE_URL = 'https://kltrar2.elutuna.workers.dev/vip'
-API_AUTH = 'kltraid-secret-Rahasiaku69456'
-# --------------------
+EVENT_URL = f'{API_BASE_URL}/event.json'
+SERVER_URL = f'{API_BASE_URL}/servereventapk.json'
 
-app = Flask(__name__)
+API_HEADERS = {
+    'X-App-Auth': 'kltraid-secret-Rahasiaku69456',
+    'User-Agent': 'okhttp/4.12.0',
+    'Accept': 'application/json'
+}
 
-def get_m3u_playlist():
-    """Fungsi inti untuk mengambil data dan membuat playlist M3U"""
-    event_url = f"{API_BASE_URL}/event.json"
-    server_url = f"{API_BASE_URL}/servereventapk.json"
-
-    headers = {
-        'X-App-Auth': API_AUTH,
-        'User-Agent': 'okhttp/4.12.0',
-        'Accept': 'application/json'
-    }
-
+def generate_m3u_playlist():
+    """
+    Mengambil data dari API, memprosesnya, dan menghasilkan string playlist M3U.
+    """
     try:
-        # Mengambil data dari dua sumber secara bersamaan
-        event_response = requests.get(event_url, headers=headers, timeout=30)
-        server_response = requests.get(server_url, headers=headers, timeout=30)
+        # Mengambil data dari kedua URL secara bersamaan (mirip Promise.all)
+        print("Mengambil data dari API...")
+        event_response = requests.get(EVENT_URL, headers=API_HEADERS, timeout=15)
+        server_response = requests.get(SERVER_URL, headers=API_HEADERS, timeout=15)
 
-        # Memastikan request berhasil
+        # Memastikan kedua permintaan berhasil
         event_response.raise_for_status()
         server_response.raise_for_status()
+        
+        print("Data berhasil diambil.")
 
         events = event_response.json()
         all_servers = server_response.json()
 
-        # Membuat peta (dictionary) untuk pencarian server yang cepat berdasarkan event ID
+        # Membuat 'map' server untuk pencarian cepat, di Python kita pakai dictionary
         server_map = {item['id']: item['servers'] for item in all_servers}
 
-        m3u_playlist = "#EXTM3U\n"
+        # Mulai membangun playlist M3U
+        m3u_lines = ['#EXTM3U']
 
         # Loop melalui setiap event
         for event in events:
-            servers_for_event = server_map.get(event.get('id'))
+            event_id = event.get('id')
+            servers_for_event = server_map.get(event_id)
 
-            if servers_for_event and len(servers_for_event) > 0:
-                # Loop melalui SETIAP server untuk event ini
+            if servers_for_event:
+                # Loop melalui setiap server untuk event ini
                 for server in servers_for_event:
-                    stream_url = server.get('url', '').strip()
+                    stream_url = server.get('url')
                     
                     # Pastikan server memiliki URL yang valid
-                    if stream_url:
-                        base_channel_name = f"{event.get('team1', {}).get('name', '')} {event.get('team2', {}).get('name', '')}"
-                        label_suffix = f" ({server.get('label', '')})" if server.get('label') else ''
-                        full_channel_name = f"{base_channel_name}{label_suffix}"
+                    if stream_url and stream_url.strip():
+                        team1_name = event.get('team1', {}).get('name', 'Tim 1')
+                        team2_name = event.get('team2', {}).get('name', 'Tim 2')
+                        base_channel_name = f"{team1_name} vs {team2_name}"
                         
-                        group_title = event.get('league', 'Unknown')
+                        label_suffix = f" ({server['label']})" if server.get('label') else ''
+                        full_channel_name = f"{base_channel_name}{label_suffix}"
+
+                        group_title = event.get('league', 'Lainnya')
                         tvg_logo = event.get('icon', '')
 
-                        # --- LOGIKA HEADER: Buat blok header HANYA JIKA ada data header ---
-                        header_lines = ""
-                        server_headers = server.get('headers')
-                        if server_headers:
-                            user_agent = server_headers.get('User-Agent', '')
-                            origin = server_headers.get('Origin', '')
-                            referer = server_headers.get('Referer', '')
-                            
-                            header_lines = (
-                                f"#EXTVLCOPT:http-user-agent={user_agent}\n"
-                                f"#EXTVLCOPT:http-origin={origin}\n"
-                                f"#EXTVLCOPT:http-referrer={referer}\n"
-                            )
-                        # ----------------------------------------------------------------
+                        # Tambahkan baris #EXTINF
+                        extinf_line = f'#EXTINF:-1 tvg-logo="{tvg_logo}" group-title="{group_title}",{full_channel_name}'
+                        m3u_lines.append(f"\n{extinf_line}")
 
-                        # Gabungkan semua bagian menjadi entri M3U
-                        m3u_playlist += (
-                            f"\n#EXTINF:-1 tvg-logo=\"{tvg_logo}\" group-title=\"{group_title}\",{full_channel_name}\n"
-                            f"{header_lines}"
-                            f"{stream_url}\n"
-                        )
-        return m3u_playlist
+                        # LOGIKA BARU: Tambahkan #EXTVLCOPT hanya jika ada data header
+                        if server.get('headers'):
+                            headers = server['headers']
+                            user_agent = headers.get('User-Agent', '')
+                            origin = headers.get('Origin', '')
+                            referer = headers.get('Referer', '')
+                            
+                            m3u_lines.append(f'#EXTVLCOPT:http-user-agent={user_agent}')
+                            m3u_lines.append(f'#EXTVLCOPT:http-origin={origin}')
+                            m3u_lines.append(f'#EXTVLCOPT:http-referrer={referer}')
+                        
+                        # Tambahkan URL stream
+                        m3u_lines.append(stream_url)
+        
+        print("Playlist M3U berhasil dibuat.")
+        return '\n'.join(m3u_lines)
 
     except requests.exceptions.RequestException as e:
-        print(f"Error saat mengambil data API: {e}")
-        return "#EXTM3U\n# Error: Gagal mengambil data dari sumber."
+        print(f"Error saat mengambil data dari API: {e}")
+        return None
     except Exception as e:
-        print(f"Terjadi error tidak terduga: {e}")
-        return "#EXTM3U\n# Error: Terjadi kesalahan internal."
+        print(f"Terjadi kesalahan internal: {e}")
+        return None
 
+if __name__ == "__main__":
+    # Jalankan fungsi utama
+    playlist_content = generate_m3u_playlist()
 
-@app.route('/playlist.m3u')
-def serve_playlist():
-    """Endpoint untuk menyajikan playlist M3U"""
-    playlist_content = get_m3u_playlist()
-    return Response(playlist_content, mimetype='application/vnd.apple.mpegurl; charset=utf-8')
-
-
-if __name__ == '__main__':
-    # Untuk menjalankan secara lokal
-    # Buka http://127.0.0.1:5000/playlist.m3u
-    app.run(debug=True, port=5000)
+    # Jika konten berhasil dibuat, simpan ke file
+    if playlist_content:
+        # Simpan hasil ke file bernama playlist.m3u
+        with open('playlist.m3u', 'w', encoding='utf-8') as f:
+            f.write(playlist_content)
+        print("File 'playlist.m3u' telah berhasil disimpan.")
+    else:
+        print("Gagal membuat file playlist karena terjadi error sebelumnya.")
