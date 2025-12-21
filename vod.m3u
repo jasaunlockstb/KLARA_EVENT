@@ -1,7 +1,8 @@
 #EXTM3U
-#EXTINF:-1 type-vod="potrait" tvg-id="" tvg-name="The Delivery Rider (2025)" tvg-logo="https://poster.lk21.party/wp-content/uploads/2025/10/film-delivery-rider-2025-lk21.jpg" group-title="Action",The Delivery Rider (2025)
+#EXTINF:-1 type-vod="potrait" tvg-id="" tvg-name="The Delivery Rider (2025)" tvg-logo="https://poster.lk21.party/wp-content/uploads/2025/12/film-jujutsu-kaisen-hidden-inventory-premature-death-movie-2025-lk21.jpg" group-title="Action",The Delivery Rider (2025)
 #KODIPROP:inputstream.adaptive.stream_headers=Referer=https://emturbovid.com/
-https://cdn2.turboviplay.com/data/68fe4bf3ac355/68fe4bf3ac355.m3u8
+https://playeriframe.sbs/iframe/hydrax/Jzf-UTEyA
+
 #EXTINF:-1 type-vod="potrait" tvg-id="" tvg-name="Delivery Run (2025)" tvg-logo="https://poster.lk21.party/wp-content/uploads/2025/10/film-delivery-run-2025-lk21.jpg" group-title="Action",Delivery Run (2025)
 #KODIPROP:inputstream.adaptive.stream_headers=Referer=https://emturbovid.com/
 https://cdn2.turboviplay.com/data/68fd1d6be7697/68fd1d6be7697.m3u8
